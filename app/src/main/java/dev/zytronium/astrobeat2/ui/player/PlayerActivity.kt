@@ -97,27 +97,35 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private var listenerAdded = false
+
     private fun connectAndPlay() {
         playbackController.connect {
             val controller = playbackController.controller ?: return@connect
 
-            // no longer needed: binding.playerView.player = controller
             setupPlayerControls(controller)
+
+            if (!listenerAdded) {
+                listenerAdded = true
+                controller.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY &&
+                            controller.playWhenReady &&
+                            !hasLoggedPlay
+                        ) {
+                            hasLoggedPlay = true
+                            viewModel.logPlay()
+                        }
+
+                        if (playbackState == Player.STATE_ENDED) {
+                            viewModel.playNext()
+                        }
+                    }
+                })
+            }
 
             val pending = pendingTrack ?: return@connect
             pendingTrack = null
-
-            controller.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY &&
-                        controller.playWhenReady &&
-                        !hasLoggedPlay
-                    ) {
-                        hasLoggedPlay = true
-                        viewModel.logPlay()
-                    }
-                }
-            })
 
             val metadata = MediaMetadata.Builder()
                 .setTitle(pending.title)
