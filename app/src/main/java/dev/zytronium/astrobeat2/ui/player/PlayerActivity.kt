@@ -28,6 +28,10 @@ class PlayerActivity : AppCompatActivity() {
     private var speedIndex = 2
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
+    // -------- guards against re-registering listeners/click handlers on every track change --------
+    private var listenerAdded = false
+    private var controlsInitialized = false
+
     private val progressRunnable = object : Runnable {
         override fun run() {
             val controller = playbackController.controller ?: return
@@ -49,6 +53,7 @@ class PlayerActivity : AppCompatActivity() {
     private var pendingTrack: PendingTrack? = null
 
     private data class PendingTrack(
+        val trackId: String,
         val isDownloaded: Boolean,
         val localFilePath: String?,
         val title: String,
@@ -84,9 +89,8 @@ class PlayerActivity : AppCompatActivity() {
             binding.textTitle.text = track.title
             binding.textArtistAlbum.text = if (album != null) "$artist - $album" else artist
 
-
-
             pendingTrack = PendingTrack(
+                trackId = track.id,
                 isDownloaded = track.isDownloaded,
                 localFilePath = track.localFilePath,
                 title = track.title,
@@ -97,13 +101,14 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private var listenerAdded = false
-
     private fun connectAndPlay() {
         playbackController.connect {
             val controller = playbackController.controller ?: return@connect
 
-            setupPlayerControls(controller)
+            if (!controlsInitialized) {
+                controlsInitialized = true
+                setupPlayerControls(controller)
+            }
 
             if (!listenerAdded) {
                 listenerAdded = true
@@ -118,7 +123,7 @@ class PlayerActivity : AppCompatActivity() {
                         }
 
                         if (playbackState == Player.STATE_ENDED) {
-                            viewModel.playNext()
+                            viewModel.playNext(isShuffleOn)
                         }
                     }
                 })
@@ -126,6 +131,11 @@ class PlayerActivity : AppCompatActivity() {
 
             val pending = pendingTrack ?: return@connect
             pendingTrack = null
+
+            // -------- same track already loaded/playing; don't restart it --------
+            if (controller.currentMediaItem?.mediaId == pending.trackId) {
+                return@connect
+            }
 
             val metadata = MediaMetadata.Builder()
                 .setTitle(pending.title)
@@ -135,6 +145,7 @@ class PlayerActivity : AppCompatActivity() {
 
             if (pending.isDownloaded && pending.localFilePath != null) {
                 val mediaItem = MediaItem.Builder()
+                    .setMediaId(pending.trackId)
                     .setUri(Uri.fromFile(File(pending.localFilePath)))
                     .setMediaMetadata(metadata)
                     .build()
@@ -146,6 +157,7 @@ class PlayerActivity : AppCompatActivity() {
                     try {
                         val url = viewModel.getStreamUrl()
                         val mediaItem = MediaItem.Builder()
+                            .setMediaId(pending.trackId)
                             .setUri(Uri.parse(url))
                             .setMediaMetadata(metadata)
                             .build()
@@ -165,14 +177,12 @@ class PlayerActivity : AppCompatActivity() {
             if (controller.isPlaying) controller.pause() else controller.play()
         }
 
-        // previous - go to previous track in queue
         binding.buttonPrevious.setOnClickListener {
-            viewModel.playPrevious()
+            viewModel.playPrevious(isShuffleOn)
         }
 
-        // next - go to next track in queue
         binding.buttonNext.setOnClickListener {
-            viewModel.playNext()
+            viewModel.playNext(isShuffleOn)
         }
 
         binding.buttonShuffle.setOnClickListener {
@@ -225,7 +235,6 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(progressRunnable)
-        // binding.playerView.player = null  <-- remove this line
         playbackController.release()
     }
 

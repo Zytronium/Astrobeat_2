@@ -31,9 +31,31 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun playNext() = navigateRelative(1)
+    fun playNext(shuffle: Boolean) {
+        if (shuffle) navigateRandom() else navigateRelative(1)
+    }
 
-    fun playPrevious() = navigateRelative(-1)
+    fun playPrevious(shuffle: Boolean) {
+        if (shuffle) navigateRandom() else navigateRelative(-1)
+    }
+
+    private fun navigateRandom() {
+        val currentId = trackId ?: return
+        viewModelScope.launch {
+            if (trackList.isEmpty()) {
+                trackList = repository.getAllTracksOnce()
+            }
+            if (trackList.size <= 1) return@launch
+
+            var newTrack: TrackEntity
+            do {
+                newTrack = trackList.random()
+            } while (newTrack.id == currentId)
+
+            trackId = newTrack.id
+            _track.value = newTrack
+        }
+    }
 
     private fun navigateRelative(delta: Int) {
         val currentId = trackId ?: return
