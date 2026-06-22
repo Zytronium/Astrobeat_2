@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Astrobeat 2</string>
+    <string name="downloaded_icon_description">Downloaded</string>
+    <string name="back_button_description">Back</string>
 </resources>

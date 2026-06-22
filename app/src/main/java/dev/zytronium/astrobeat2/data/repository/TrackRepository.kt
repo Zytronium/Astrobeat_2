@@ -21,9 +21,16 @@ class TrackRepository @Inject constructor(
 
     // -------- called on app launch and by sync worker --------
     suspend fun sync() {
-        val response = api.sync()
+        val response = try {
+            api.sync()
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 401) {
+                throw SecurityException("Invalid or missing API secret", e)
+            }
+            throw e
+        }
 
-        // -------- merge remote tracks with existing local state --------
+        // merge remote tracks with existing local state
         val merged = response.tracks.map { dto ->
             val existing = dao.getTrackById(dto.id)
             TrackEntity.fromDto(dto, existing)

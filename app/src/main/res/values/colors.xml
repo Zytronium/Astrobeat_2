@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="space_background">#050B2E</color>
+    <color name="space_foreground">#F6F7FF</color>
+
+    <color name="cyan_accent">#22D3EE</color>
+    <color name="cyan_accent_dim">#0EA5C4</color>
+    <color name="violet_glow">#FF4DFF</color>
+
+    <color name="card_background">#33172554</color>
+    <color name="card_border">#4D22D3EE</color>
+
+    <color name="text_secondary">#B3C2C9D9</color>
 </resources>
