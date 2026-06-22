@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- outer glow -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#4000C8FF" />
+        </shape>
+    </item>
+    <!-- gradient fill -->
+    <item
+        android:left="4dp"
+        android:top="4dp"
+        android:right="4dp"
+        android:bottom="4dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="linear"
+                android:startColor="#0090CC"
+                android:endColor="#00C8FF"
+                android:angle="135" />
+        </shape>
+    </item>
+</layer-list>

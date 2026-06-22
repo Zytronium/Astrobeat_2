@@ -1,5 +1,6 @@
 package dev.zytronium.astrobeat2.ui.player
 
+import dev.zytronium.astrobeat2.R
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -19,9 +20,27 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class PlayerActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityPlayerBinding
     private val viewModel: PlayerViewModel by viewModels()
+    private var isShuffleOn = false
+    private var isLoopOn = false
+    private val speedOptions = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+    private var speedIndex = 2
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            val controller = playbackController.controller ?: return
+            val pos = controller.currentPosition
+            val dur = controller.duration.coerceAtLeast(1)
+            binding.seekBar.progress = ((pos.toFloat() / dur) * 1000).toInt()
+            binding.textPosition.text = formatMs(pos)
+            binding.textDuration.text = formatMs(dur)
+            val icon = if (controller.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+            binding.buttonPlayPause.setImageResource(icon)
+            handler.postDelayed(this, 500)
+        }
+    }
 
     @Inject
     lateinit var playbackController: PlaybackController
@@ -58,10 +77,14 @@ class PlayerActivity : AppCompatActivity() {
         viewModel.track.observe(this) { track ->
             if (track == null) return@observe
 
+            hasLoggedPlay = false
+
             val artist = track.artist ?: "Unknown Artist"
             val album = track.album
             binding.textTitle.text = track.title
             binding.textArtistAlbum.text = if (album != null) "$artist - $album" else artist
+
+
 
             pendingTrack = PendingTrack(
                 isDownloaded = track.isDownloaded,
@@ -77,7 +100,9 @@ class PlayerActivity : AppCompatActivity() {
     private fun connectAndPlay() {
         playbackController.connect {
             val controller = playbackController.controller ?: return@connect
-            binding.playerView.player = controller
+
+            // no longer needed: binding.playerView.player = controller
+            setupPlayerControls(controller)
 
             val pending = pendingTrack ?: return@connect
             pendingTrack = null
@@ -127,9 +152,72 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupPlayerControls(controller: androidx.media3.session.MediaController) {
+        binding.buttonPlayPause.setOnClickListener {
+            if (controller.isPlaying) controller.pause() else controller.play()
+        }
+
+        // previous - go to previous track in queue
+        binding.buttonPrevious.setOnClickListener {
+            viewModel.playPrevious()
+        }
+
+        // next - go to next track in queue
+        binding.buttonNext.setOnClickListener {
+            viewModel.playNext()
+        }
+
+        binding.buttonShuffle.setOnClickListener {
+            isShuffleOn = !isShuffleOn
+            controller.shuffleModeEnabled = isShuffleOn
+            updateToggleButton(binding.buttonShuffle, isShuffleOn)
+        }
+
+        binding.buttonLoop.setOnClickListener {
+            isLoopOn = !isLoopOn
+            controller.repeatMode = if (isLoopOn) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            updateToggleButton(binding.buttonLoop, isLoopOn)
+        }
+
+        binding.buttonSpeed.setOnClickListener {
+            speedIndex = (speedIndex + 1) % speedOptions.size
+            val speed = speedOptions[speedIndex]
+            controller.setPlaybackParameters(androidx.media3.common.PlaybackParameters(speed))
+            binding.buttonSpeed.text = formatSpeed(speed)
+        }
+
+        binding.seekBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser && controller.duration > 0) {
+                    controller.seekTo((progress / 1000f * controller.duration).toLong())
+                }
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+        })
+
+        handler.post(progressRunnable)
+    }
+
+    private fun updateToggleButton(button: android.widget.ImageButton, active: Boolean) {
+        val bgRes = if (active) R.drawable.bg_button_active_glow else R.drawable.bg_button_inactive
+        val tintRes = if (active) R.color.cyan_accent else R.color.text_secondary
+        button.background = androidx.core.content.ContextCompat.getDrawable(this, bgRes)
+        button.imageTintList = androidx.core.content.ContextCompat.getColorStateList(this, tintRes)
+    }
+
+    private fun formatMs(ms: Long): String {
+        val totalSec = ms / 1000
+        return "%d:%02d".format(totalSec / 60, totalSec % 60)
+    }
+
+    private fun formatSpeed(speed: Float): String =
+        if (speed == speed.toLong().toFloat()) "${speed.toInt()}x" else "${speed}x"
+
     override fun onDestroy() {
         super.onDestroy()
-        binding.playerView.player = null
+        handler.removeCallbacks(progressRunnable)
+        // binding.playerView.player = null  <-- remove this line
         playbackController.release()
     }
 

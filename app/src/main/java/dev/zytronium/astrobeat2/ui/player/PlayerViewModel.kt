@@ -19,11 +19,37 @@ class PlayerViewModel @Inject constructor(
     val track: LiveData<TrackEntity?> = _track
 
     private var trackId: String? = null
+    private var trackList: List<TrackEntity> = emptyList()
 
     fun loadTrack(id: String) {
         trackId = id
         viewModelScope.launch {
+            if (trackList.isEmpty()) {
+                trackList = repository.getAllTracksOnce()
+            }
             _track.value = repository.getTrackById(id)
+        }
+    }
+
+    fun playNext() = navigateRelative(1)
+
+    fun playPrevious() = navigateRelative(-1)
+
+    private fun navigateRelative(delta: Int) {
+        val currentId = trackId ?: return
+        viewModelScope.launch {
+            if (trackList.isEmpty()) {
+                trackList = repository.getAllTracksOnce()
+            }
+            if (trackList.isEmpty()) return@launch
+
+            val currentIndex = trackList.indexOfFirst { it.id == currentId }
+            if (currentIndex == -1) return@launch
+
+            val newIndex = (currentIndex + delta + trackList.size) % trackList.size
+            val newTrack = trackList[newIndex]
+            trackId = newTrack.id
+            _track.value = newTrack
         }
     }
 

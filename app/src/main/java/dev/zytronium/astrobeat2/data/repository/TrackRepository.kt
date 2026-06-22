@@ -5,9 +5,11 @@ import dev.zytronium.astrobeat2.data.local.entity.TrackEntity
 import dev.zytronium.astrobeat2.data.remote.AstrobeatApi
 import dev.zytronium.astrobeat2.data.remote.dto.PlayRequest
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+
 
 @Singleton
 class TrackRepository @Inject constructor(
@@ -62,4 +64,7 @@ class TrackRepository @Inject constructor(
 
     suspend fun getTracksToEvict(evictBefore: String): List<TrackEntity> =
         dao.getTracksToEvict(evictBefore)
+
+    // -------- one-shot snapshot of all tracks, used for prev/next navigation --------
+    suspend fun getAllTracksOnce(): List<TrackEntity> = dao.getAllTracks().first()
 }
